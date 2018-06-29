@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>星云歌词网</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  <style type="text/css">
+    [v-cloak] {
+      display: none;
+    }
+  </style>
+<body>
+  <div id="app" v-cloak>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <a class="navbar-brand" href="#">星云歌词网</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarColor02" aria-controls="navbarColor02" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarColor02">
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item active">
+            <a class="nav-link" href="#">主页 <span class="sr-only">(current)</span></a>
+          </li>
+        </ul>
+        <form class="form-inline" v-on:submit.prevent="postSong" autocomplete="off">
+          <input
+              class="form-control mr-sm-2"
+              v-model="newSongTitle"
+              id="new-song"
+              placeholder="歌曲名"
+          >
+          <button class="btn btn-outline-light my-2 my-sm-0">添加歌曲</button>
+        </form>
+      </div>
+    </nav>
+    <div class="container">
+      <br>
+      <div>
+        <div v-if="!online">
+          <div class="alert alert-primary" role="alert">
+            添加歌曲和歌词需要使用星云钱包支付交易所需 Gas，请 <a href="https://github.com/nebulasio/WebExtensionWallet" target="_blank" class="alert-link">安装钱包插件</a> 后使用相关功能
+          </div>
+        </div>
+
+        <!-- Song List -->
+        <div class="row">
+          <div class="col-md-6">
+            <h1>歌曲列表<span v-if="songListSize == 0">（暂无歌曲）</span></h1>
+          </div>
+          <div class="col-md-6 text-right">
+            <button type="button"
+                    class="btn btn-info"
+                    v-on:click.prevent="refresh"
+            >
+              <span v-if="songListSize == -1">加载中…</span>
+              <span v-else>刷新列表</span>
+            </button>
+          </div>
+        </div>
+        <div class="row list-group" v-if="songList">
+          <a
+              class="list-group-item d-flex justify-content-between align-items-center list-group-item-action"
+              v-for="song in songList"
+          >
+            {{ song.value.title }}
+            <span class="pull-right">
+              <button class="btn btn-link"
+                      data-toggle="modal"
+                      data-target="#updateLyricsModal"
+                      v-on:click.prevent="setSongForAppendLyrics(song)">上传歌词</button>
+              <button class="btn btn-link"
+                      data-toggle="modal"
+                      data-target="#lyricsModal"
+                      v-on:click.prevent="setSelectSong(song)">查看歌词</button>
+              <span class="badge badge-primary badge-pill">{{ song.value.lyricsIDs.length}} </span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </div>
+    <template id="bs-modal">
+      <!-- MODAL -->
+      <div class="modal fade" id="updateLyricsModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="exampleModalLabel">添加歌词到 <span v-if="songForAppendLyrics">{{ songForAppendLyrics.value.title }}</span></h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <div class="modal-body">
+              <form>
+                <div class="form-group">
+                  <label for="message-text" class="col-form-label">歌词：</label>
+                  <textarea class="form-control" id="message-text" v-model="lyricsToAppend"></textarea>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+              <button type="button"
+                      class="btn btn-primary"
+                      data-dismiss="modal"
+                      v-bind:class="{ disabled: !isUpdateLyricsModalUploadButtonActive }"
+                      v-on:click.prevent="appendLyrics"
+              >添加</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- MODAL -->
+      <div class="modal fade" id="lyricsModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel2" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="lyricsModalLabel" v-if="selectSong">{{ selectSong.value.title }}</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div v-if="selectSong && selectSong.value.lyricsIDs.length > 0" style="white-space: pre-line">
+                <span v-if="selectLyrics === '加载中……'">加载中……</span>
+                <span v-else>{{ selectLyrics.lyrics }}</span>
+              </div>
+              <div v-else>
+                暂无歌词
+              </div>
+              <br>
+              <nav
+                  aria-label="Page navigation example"
+                  v-if="selectSong && selectSong.value.lyricsIDs.length > 0"
+              >
+                <ul class="pagination justify-content-center">
+                  <li class="page-item"
+                      v-bind:class="{ active: index === selectLyricsIndex }"
+                      v-for="(lyrics, index) in selectSong.value.lyricsIDs"
+                  >
+                    <a class="page-link" @click="setSelectLyricsIndex(index)">{{ index + 1 }}</a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary" data-dismiss="modal">关闭</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/nebulas@0.5.2/dist/nebulas.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/nebpay.js@0.2.0/dist/nebPay.min.js"></script>
+  <script src="indexVue.js" charset="UTF-8"></script>
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+</body>
+</html>
